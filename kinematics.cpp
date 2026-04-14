@@ -3,8 +3,8 @@
 
 // Motor config
 const int  STEPS_PER_REV  = 200;    // 1.8deg NEMA17
-const int  MICROSTEPS     = 16;     // TMC2209 default microstep
-const long STEPS_FULL_REV = STEPS_PER_REV * MICROSTEPS; // 3200
+const int  MICROSTEPS     = 8;     // TMC2209 default microstep
+const long STEPS_FULL_REV = STEPS_PER_REV * MICROSTEPS; // 1600
 
 // Minimum safe pulse delay
 const int MIN_DELAY_US = 10;
@@ -20,7 +20,7 @@ long degreesToSteps(float deg) {
 // all finish at the same wall-clock time.
 
 // duration_us = duration_ms * 1000
-// delayUs[i]  = duration_us / (absSteps[i] * 2)
+// delayUs[i] = duration_us / (absSteps[i] * 2)
 // (* 2 because one step = HIGH pulse + LOW pulse)
 void calcDelaysFromDuration(long steps[4], int duration_ms, int outDelayUs[4]) {
     long duration_us = (long)duration_ms * 1000L;

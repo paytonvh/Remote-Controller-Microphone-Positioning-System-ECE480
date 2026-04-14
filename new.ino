@@ -30,8 +30,9 @@ void handleCommand(String cmd) {
     int  start       = 0;
 
     while (start < (int)cmd.length()) {
-        int    commaIdx = cmd.indexOf(',', start);
-        String token    = (commaIdx == -1)
+
+        int commaIdx = cmd.indexOf(',', start);
+        String token = (commaIdx == -1)
                             ? cmd.substring(start)
                             : cmd.substring(start, commaIdx);
         token.trim();
@@ -39,7 +40,7 @@ void handleCommand(String cmd) {
         if (token.startsWith("M")) {
             int colonIdx = token.indexOf(':');
             if (colonIdx != -1) {
-                int   motorNum = token.substring(1, colonIdx).toInt();
+                int motorNum = token.substring(1, colonIdx).toInt();
                 float degrees  = token.substring(colonIdx + 1).toFloat();
                 if (motorNum >= 1 && motorNum <= 4)
                     steps[motorNum - 1] = degreesToSteps(degrees);

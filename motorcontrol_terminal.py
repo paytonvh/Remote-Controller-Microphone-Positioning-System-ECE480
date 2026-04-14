@@ -8,7 +8,7 @@ import math
 ser = serial.Serial(port='/dev/ttyUSB0', baudrate=115200, timeout=1)
 
 # Mic state 
-HOME_POS = [19.0, 43.0, 52.0]   # X, Y, Z (inches)
+HOME_POS = [19.0, 43.0, 46.0]   # X, Y, Z (inches)
 mic_pos  = HOME_POS.copy()
 
 # Room geometry
@@ -37,14 +37,15 @@ STEP_SIZES  = [0.5, 1.0, 3.0, 6.0, 12.0]
 step_index  = 2
 step_size   = STEP_SIZES[step_index]
 
-# 
+# Clamp the value between the lower and upper bounds
 def clamp(value, lo, hi):
     return max(lo, min(hi, value))
 
-# Calculate cable length for 
+# Calculate cable length for a given position and corner
 def cable_length(pos, corner):
     return math.sqrt(sum((pos[i] - corner[i])**2 for i in range(3)))
 
+# Calculate the distance between two points
 def distance(a, b):
     return math.sqrt(sum((a[i] - b[i])**2 for i in range(3)))
 
@@ -52,7 +53,7 @@ def distance(a, b):
 Calculate move duration in ms from distance and speed.
 """
 def duration_from_dist(dist, speed_ips):
-    if dist < 0.001:
+    if dist < 0.1:
         return 0
     ms = int((dist / speed_ips) * 1000)
     return max(ms, 100)   # 100ms minimum so ramp has room to run
@@ -85,11 +86,11 @@ def load_position():
             mic_pos = [x, y, z]
             print(f"Restored position: X={x:.2f}  Y={y:.2f}  Z={z:.2f}")
     except FileNotFoundError:
-        print("No position file — starting at home.")
-        mic_pos = HOME_POS.copy()
+        print("No position file. Check that the position.txt file is in the correct directory.")
+        break; # Exit the program
     except ValueError:
-        print("Position file corrupted — starting at home.")
-        mic_pos = HOME_POS.copy()
+        print("Position file corrupted. Check that the file is in the correct format.")
+        break;
 
 # Communication
 def wait_for_done(timeout=60.0):
@@ -113,21 +114,6 @@ def send_blocking(packet, new_pos):
     save_position(mic_pos)
 
 """
-Compute Jacobian factor for the Z-axis movement
-"""
-def z_amplification_factor(pos):
-    total = 0
-    for corner in CORNERS:
-        dx = corner[0] - pos[0]
-        dy = corner[1] - pos[1]
-        dz = corner[2] - pos[2]
-        L  = math.sqrt(dx*dx + dy*dy + dz*dz)
-
-        # how much cable changes per unit Z
-        total += abs(dz / L)
-    return total / 4
-
-"""
 Move mic by (dx, dy, dz)
 Blocks until ESP32 confirms done
 """
@@ -143,11 +129,11 @@ def move_mic(dx, dy, dz):
     ]
 
     dist = distance(prev, new)
-    if dist < 0.001:
+    if dist < 0.1:
         print("Already at boundary in that direction.")
         return
 
-    dur    = duration_from_dist(dist, CRUISE_SPEED_IPS)
+    dur = duration_from_dist(dist, CRUISE_SPEED_IPS)
     packet = build_packet(prev, new, dur, blocking=True)
 
     print(f"Moving to X={new[0]:.2f}  Y={new[1]:.2f}  Z={new[2]:.2f}  "
@@ -167,12 +153,10 @@ def move_backward():
     move_mic(0.0, step_size, 0.0)
 
 def move_up():
-    factor = z_amplification_factor(mic_pos)
-    move_mic(0.0, 0.0, step_size / factor)
+    move_mic(0.0, 0.0, step_size)
 
 def move_down():
-    factor = z_amplification_factor(mic_pos)
-    move_mic(0.0, 0.0, -step_size / factor)
+    move_mic(0.0, 0.0, -step_size)
 
 def mic_home():
     global mic_pos
@@ -182,17 +166,17 @@ def mic_home():
     step1   = [prev[0], prev[1], safe_z]
     dist1   = distance(prev, step1)
 
-    if dist1 > 0.001:
+    if dist1 > 0.1:
         dur1   = duration_from_dist(dist1, HOME_SPEED_IPS)
         pkt1   = build_packet(prev, step1, dur1, blocking=True)
         print("Homing")
         send_blocking(pkt1, step1)
 
-    prev2   = mic_pos.copy()
-    target  = HOME_POS.copy()
-    dist2   = distance(prev2, target)
+    prev2 = mic_pos.copy()
+    target = HOME_POS.copy()
+    dist2 = distance(prev2, target)
 
-    if dist2 > 0.001:
+    if dist2 > 0.1:
         dur2   = duration_from_dist(dist2, HOME_SPEED_IPS)
         pkt2   = build_packet(prev2, target, dur2, blocking=True)
         send_blocking(pkt2, target)
@@ -203,7 +187,7 @@ def mic_emergency():
     prev   = mic_pos.copy()
     target = [prev[0], prev[1], BOUNDS['z'][1]]
     dist   = distance(prev, target)
-    if dist < 0.001:
+    if dist < 0.1:
         print("Already at max Z.")
         return
     dur    = duration_from_dist(dist, EMERGENCY_SPEED_IPS)

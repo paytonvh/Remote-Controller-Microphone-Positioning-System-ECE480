@@ -9,11 +9,11 @@ const int DIR[4]  = {26,  4, 33, 19};
 
 // The ramp occupies this fraction of the total move at each end.
 // e.g. 0.25 = first 25% ramp up, last 25% ramp down, middle 50% cruise.
-static const float RAMP_FRACTION = 0.15f;
+static const float RAMP_FRACTION = 0.25f;
 
 // Ratio of start/end speed to cruise speed (0.0–1.0).
 // e.g. 0.1 = start at 10% of cruise speed, ramp up to 100%.
-static const float MIN_SPEED_RATIO = 0.30f;
+static const float MIN_SPEED_RATIO = 0.25f;
 
 // Step state machine
 static long s_steps[4] = {0, 0, 0, 0};
@@ -48,44 +48,44 @@ bool motors_moving()  { return s_moving; }
 static int rampedMasterDelay(long tick, long maxSteps, int cruiseDelay) {
     if (maxSteps == 0) return cruiseDelay;
 
-    float progress = (float)tick / (float)maxSteps;  // 0.0 → 1.0
+    float progress = (float)tick / (float)maxSteps;
     float ratio;
 
+    // Ramp up the movement until it reaches the ramp fraction
     if (progress < RAMP_FRACTION) {
-        // Ramp up — lerp from MIN_SPEED_RATIO to 1.0
         ratio = MIN_SPEED_RATIO + (1.0f - MIN_SPEED_RATIO) * (progress / RAMP_FRACTION);
+
+    // Ramp down the movement until it reaches the ramp fraction
     } else if (progress > (1.0f - RAMP_FRACTION)) {
-        // Ramp down — lerp from 1.0 to MIN_SPEED_RATIO
         float t = (progress - (1.0f - RAMP_FRACTION)) / RAMP_FRACTION;
         ratio = 1.0f - (1.0f - MIN_SPEED_RATIO) * t;
+
+    // Cruise speed
     } else {
-        // Cruise
         ratio = 1.0f;
     }
 
-    // Higher ratio = faster speed = lower delay
-    // delay = cruiseDelay / ratio  (speed is inversely proportional to delay)
-    int d = (int)((float)cruiseDelay / ratio);
-    return max(d, 39);  // never below MIN_DELAY_US
+    int delay = (int)((float)cruiseDelay / ratio);
+    return max(delay, MIN_DELAY_US);
 }
 
-// stepMotorsTimed
 void stepMotorsTimed(long steps[4], int delayUs[4]) {
     s_maxSteps    = 0;
     s_masterCruise = INT_MAX;
 
     for (int i = 0; i < 4; i++) {
-        s_steps[i]        = steps[i];
-        s_cruiseDelayUs[i]= delayUs[i];
-        s_accumulator[i]  = 0;
-        s_timeAccum[i]    = 0;
+        s_steps[i] = steps[i];
+        s_cruiseDelayUs[i] = delayUs[i];
+        s_accumulator[i] = 0;
+        s_timeAccum[i] = 0;
 
         if (steps[i] != 0) {
             bool dir = steps[i] > 0 ? LOW : HIGH;
             if (i == 1 || i == 3) dir = !dir;
             digitalWrite(DIR[i], dir);
 
-            s_maxSteps     = max(s_maxSteps, abs(steps[i]));
+            // Finds longest cable movement for total move duration
+            s_maxSteps = max(s_maxSteps, abs(steps[i]));
             if (delayUs[i] > 0)
                 s_masterCruise = min(s_masterCruise, delayUs[i]);
         }
@@ -94,12 +94,12 @@ void stepMotorsTimed(long steps[4], int delayUs[4]) {
     if (s_maxSteps == 0) return;
     if (s_masterCruise == INT_MAX) s_masterCruise = 156;
 
-    s_tick   = 0;
+    s_tick = 0;
     s_moving = true;
     delayMicroseconds(100);
 }
 
-// movement_update
+// Called every loop() to advance the move state machine one step
 bool movement_update() {
     if (!s_moving) return true;
 
