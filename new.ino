@@ -22,7 +22,7 @@ void handleCommand(String cmd) {
         return;
     }
 
-    // ── Move packet ───────────────────────────────────────────
+    // Move packet
     // Format: "M1:deg,M2:deg,M3:deg,M4:deg,DUR:ms,BLOCK"
     long steps[4]    = {0, 0, 0, 0};
     int  duration_ms = 500;

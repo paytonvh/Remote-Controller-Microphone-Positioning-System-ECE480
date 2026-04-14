@@ -2,31 +2,30 @@
 #include <climits>
 #include <math.h>
 
-// ── Pin definitions ───────────────────────────────────────────
+// Pin definitions
 const int EN_PIN  = 27;
 const int STEP[4] = {25, 14, 32, 18};
 const int DIR[4]  = {26,  4, 33, 19};
 
-// ── Trapezoidal ramp config ───────────────────────────────────
 // The ramp occupies this fraction of the total move at each end.
 // e.g. 0.25 = first 25% ramp up, last 25% ramp down, middle 50% cruise.
 static const float RAMP_FRACTION = 0.15f;
 
 // Ratio of start/end speed to cruise speed (0.0–1.0).
-// 0.1 = start at 10% of cruise speed, ramp up to 100%.
+// e.g. 0.1 = start at 10% of cruise speed, ramp up to 100%.
 static const float MIN_SPEED_RATIO = 0.30f;
 
-// ── Step state machine ────────────────────────────────────────
-static long  s_steps[4]       = {0, 0, 0, 0};
-static long  s_accumulator[4] = {0, 0, 0, 0};
-static long  s_timeAccum[4]   = {0, 0, 0, 0};
-static long  s_maxSteps        = 0;
-static long  s_tick             = 0;
-static int   s_cruiseDelayUs[4]= {0, 0, 0, 0};  // delay at full cruise speed
-static int   s_masterCruise    = 0;              // fastest motor cruise delay
-static bool  s_moving           = false;
+// Step state machine
+static long s_steps[4] = {0, 0, 0, 0};
+static long s_accumulator[4] = {0, 0, 0, 0};
+static long s_timeAccum[4] = {0, 0, 0, 0};
+static long s_maxSteps = 0;
+static long s_tick = 0;
+static int s_cruiseDelayUs[4] = {0, 0, 0, 0};  // delay at full cruise speed
+static int s_masterCruise = 0;              // fastest motor cruise delay
+static bool s_moving = false;
 
-// ── Init ──────────────────────────────────────────────────────
+// Init
 void movement_init() {
     pinMode(EN_PIN, OUTPUT);
     motors_enable();
@@ -42,7 +41,7 @@ void motors_enable()  { digitalWrite(EN_PIN, LOW);  }
 void motors_disable() { digitalWrite(EN_PIN, HIGH); }
 bool motors_moving()  { return s_moving; }
 
-// ── Ramp delay calculation ────────────────────────────────────
+// Ramp delay calculation
 // Given current tick and total steps, returns the delay for the
 // master motor at this point in the trapezoidal profile.
 // Slower motors scale proportionally from their cruise delay.
@@ -70,7 +69,7 @@ static int rampedMasterDelay(long tick, long maxSteps, int cruiseDelay) {
     return max(d, 39);  // never below MIN_DELAY_US
 }
 
-// ── stepMotorsTimed ───────────────────────────────────────────
+// stepMotorsTimed
 void stepMotorsTimed(long steps[4], int delayUs[4]) {
     s_maxSteps    = 0;
     s_masterCruise = INT_MAX;
@@ -100,7 +99,7 @@ void stepMotorsTimed(long steps[4], int delayUs[4]) {
     delayMicroseconds(100);
 }
 
-// ── movement_update ───────────────────────────────────────────
+// movement_update
 bool movement_update() {
     if (!s_moving) return true;
 
